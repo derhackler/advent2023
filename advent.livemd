@@ -1,0 +1,595 @@
+<!-- livebook:{"persist_outputs":true} -->
+
+# Advent 2023
+
+## Section
+
+## Day 2
+
+```elixir
+d2p1example = """
+Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green
+Game 2: 1 blue, 2 green; 3 green, 4 blue, 1 red; 1 green, 1 blue
+Game 3: 8 green, 6 blue, 20 red; 5 blue, 4 red, 13 green; 5 green, 1 red
+Game 4: 1 green, 3 red, 6 blue; 3 green, 6 red; 3 green, 15 blue, 14 red
+Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green
+"""
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+"Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green\nGame 2: 1 blue, 2 green; 3 green, 4 blue, 1 red; 1 green, 1 blue\nGame 3: 8 green, 6 blue, 20 red; 5 blue, 4 red, 13 green; 5 green, 1 red\nGame 4: 1 green, 3 red, 6 blue; 3 green, 6 red; 3 green, 15 blue, 14 red\nGame 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green\n"
+```
+
+```elixir
+defmodule Day2Part1 do
+  def solve(input) do
+    input
+    |> String.split("\n", trim: true)
+    |> Enum.map(&parse/1)
+    |> Enum.map(fn game ->
+      Enum.reduce(game, false, fn rgb, acc -> more_than_max(rgb) or acc end)
+    end)
+    |> Enum.with_index(1)
+    |> Enum.filter(fn {impossible, _} -> impossible == false end)
+    |> Enum.reduce(0, fn {_, idx}, acc -> acc + idx end)
+  end
+
+  def parse(input) do
+    # Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green
+    input
+    # ignore the 'Game num:' part
+    |> String.split(":", trim: true)
+    |> List.last()
+    # split the rounds
+    |> String.split(";", trim: true)
+    # [{4, 0, 3}, {1, 2, 6}, {0, 2, 0}]
+    |> Enum.map(&parse_rgb/1)
+  end
+
+  def parse_rgb(input) do
+    #  3 blue, 4 red
+    input
+    |> String.split([" ", ","], trim: true)
+    # [["3", "blue"], ["4", "red"]]
+    |> Enum.chunk_every(2)
+    |> Enum.reduce({0, 0, 0}, fn chunk, {r, g, b} ->
+      case chunk do
+        [num, "red"] -> {String.to_integer(num), g, b}
+        [num, "green"] -> {r, String.to_integer(num), b}
+        [num, "blue"] -> {r, g, String.to_integer(num)}
+      end
+    end)
+  end
+
+  def more_than_max({r, _g, _b}) when r > 12, do: true
+  def more_than_max({_r, g, _b}) when g > 13, do: true
+  def more_than_max({_r, _g, b}) when b > 14, do: true
+  def more_than_max(_rgb), do: false
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Day2Part1, <<70, 79, 82, 49, 0, 0, 16, ...>>, {:more_than_max, 1}}
+```
+
+```elixir
+Day2Part1.solve(d2p1example)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+8
+```
+
+```elixir
+Day2Part1.solve(File.read!("d2.txt"))
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+2685
+```
+
+```elixir
+defmodule Day2Part2 do
+  def solve(input) do
+    input
+    |> String.split("\n", trim: true)
+    |> Enum.map(&parse/1)
+    |> Enum.map(fn game ->
+      Enum.reduce(game, {0, 0, 0}, fn rgb, acc -> min_req(rgb, acc) end)
+    end)
+    |> Enum.map(fn {r, g, b} -> r * g * b end)
+    |> Enum.sum()
+  end
+
+  def parse(input) do
+    # Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green
+    input
+    # ignore the 'Game num:' part
+    |> String.split(":", trim: true)
+    |> List.last()
+    # split the rounds
+    |> String.split(";", trim: true)
+    # [{4, 0, 3}, {1, 2, 6}, {0, 2, 0}]
+    |> Enum.map(&parse_rgb/1)
+  end
+
+  def parse_rgb(input) do
+    #  3 blue, 4 red
+    input
+    |> String.split([" ", ","], trim: true)
+    # [["3", "blue"], ["4", "red"]]
+    |> Enum.chunk_every(2)
+    |> Enum.reduce({0, 0, 0}, fn chunk, {r, g, b} ->
+      case chunk do
+        [num, "red"] -> {String.to_integer(num), g, b}
+        [num, "green"] -> {r, String.to_integer(num), b}
+        [num, "blue"] -> {r, g, String.to_integer(num)}
+      end
+    end)
+  end
+
+  def min_req({r, g, b}, {rmin, gmin, bmin}) do
+    {max(r, rmin), max(g, gmin), max(b, bmin)}
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Day2Part2, <<70, 79, 82, 49, 0, 0, 15, ...>>, {:min_req, 2}}
+```
+
+```elixir
+Day2Part2.solve(d2p1example)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+2286
+```
+
+```elixir
+Day2Part2.solve(File.read!("d2.txt"))
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+83707
+```
+
+## Day 3
+
+```elixir
+d3p1example = """
+467..114..
+...*......
+..35..633.
+......#...
+617*......
+.....+.58.
+..592.....
+......755.
+...$.*....
+.664.598..
+"""
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+"467..114..\n...*......\n..35..633.\n......#...\n617*......\n.....+.58.\n..592.....\n......755.\n...$.*....\n.664.598..\n"
+```
+
+```elixir
+defmodule Day3Part1 do
+  def solve(input) do
+    parsed = parse(input, %{:position => {0, 0}, numbers: []})
+
+    parsed[:numbers]
+    |> Enum.filter(fn num -> find_symbol_for(num, parsed[:symbols]) end)
+    |> Enum.reduce(0, fn {num, _, _, _}, acc -> acc + String.to_integer(num) end)
+  end
+
+  def find_symbol_for({number, xs, xe, y}, symbols) do
+    symbols
+    |> Enum.any?(fn {_symbol, sx, sy} ->
+      case {sx, sy} do
+        {sx, sy} when sx + 1 >= xs and sx - 1 <= xe and sy + 1 == y -> true
+        {sx, sy} when sx == xs - 1 and sy == y -> true
+        {sx, sy} when sx == xe + 1 and sy == y -> true
+        {sx, sy} when sx + 1 >= xs and sx - 1 <= xe and sy - 1 == y -> true
+        _else -> false
+      end
+    end)
+  end
+
+  def parse(<<char::binary-size(1), rest::binary>>, acc) do
+    {x, y} = Map.get(acc, :position)
+
+    case chartype(char) do
+      :eol ->
+        acc = Map.update!(acc, :numbers, fn list -> list ++ [Map.get(acc, :number)] end)
+        acc = Map.delete(acc, :number)
+        acc = Map.update!(acc, :position, fn {_x, y} -> {0, y + 1} end)
+        parse(rest, acc)
+
+      :dot ->
+        acc = Map.update!(acc, :numbers, fn list -> list ++ [Map.get(acc, :number)] end)
+        acc = Map.delete(acc, :number)
+        acc = Map.update!(acc, :position, fn {x, y} -> {x + 1, y} end)
+        parse(rest, acc)
+
+      :number ->
+        acc =
+          Map.update(acc, :number, {char, x, x, y}, fn {number, xs, xe, y} ->
+            {number <> char, xs, xe + 1, y}
+          end)
+
+        acc = Map.update!(acc, :position, fn {x, y} -> {x + 1, y} end)
+        parse(rest, acc)
+
+      :symbol ->
+        acc = Map.update!(acc, :numbers, fn list -> list ++ [Map.get(acc, :number)] end)
+        acc = Map.delete(acc, :number)
+
+        acc =
+          Map.update(acc, :symbols, [{char, x, y}], fn symbols -> symbols ++ [{char, x, y}] end)
+
+        acc = Map.update!(acc, :position, fn {x, y} -> {x + 1, y} end)
+        parse(rest, acc)
+    end
+  end
+
+  def parse(<<"", _rest::binary>>, acc) do
+    acc =
+      Map.update!(acc, :numbers, fn list ->
+        (list ++ [Map.get(acc, :number)]) |> Enum.filter(& &1)
+      end)
+
+    Map.delete(acc, :number)
+  end
+
+  defp chartype("."), do: :dot
+  defp chartype("\n"), do: :eol
+
+  defp chartype(other) do
+    case Enum.member?(~w/1 2 3 4 5 6 7 8 9 0/, other) do
+      true -> :number
+      false -> :symbol
+    end
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+warning: variable "number" is unused (if the variable is not meant to be used, prefix it with an underscore)
+  advent.livemd#cell:3yyixuzc4yg6zlpoyv7i6a6uc4yygvwc:9: Day3Part1.find_symbol_for/2
+
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Day3Part1, <<70, 79, 82, 49, 0, 0, 26, ...>>, {:chartype, 1}}
+```
+
+```elixir
+Day3Part1.solve(d3p1example)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+4361
+```
+
+```elixir
+Day3Part1.solve(File.read!("d3.txt"))
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+550064
+```
+
+```elixir
+d3p2example = """
+467..114..
+...*......
+..35..633.
+......#...
+617*......
+.....+.58.
+..592.....
+......755.
+...$.*....
+.664.598..
+"""
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+"467..114..\n...*......\n..35..633.\n......#...\n617*......\n.....+.58.\n..592.....\n......755.\n...$.*....\n.664.598..\n"
+```
+
+```elixir
+defmodule Day3Part2 do
+  def solve(input) do
+    parsed = parse(input, %{:position => {0, 0}, numbers: []})
+
+    parsed[:symbols]
+    |> Enum.filter(fn {symbol, _, _} -> symbol == "*" end)
+    |> Enum.map(fn symbol -> find_numbers_for(symbol, parsed[:numbers]) end)
+    |> Enum.filter(fn list -> length(list) == 2 end)
+    |> Enum.map(fn [{num1, _, _, _}, {num2, _, _, _}] ->
+      String.to_integer(num1) * String.to_integer(num2)
+    end)
+    |> Enum.sum()
+  end
+
+  def find_numbers_for({symbol, sx, sy}, numbers) do
+    numbers
+    |> Enum.filter(fn {number, xs, xe, y} ->
+      case {sx, sy} do
+        {sx, sy} when sx + 1 >= xs and sx - 1 <= xe and sy + 1 == y -> true
+        {sx, sy} when sx == xs - 1 and sy == y -> true
+        {sx, sy} when sx == xe + 1 and sy == y -> true
+        {sx, sy} when sx + 1 >= xs and sx - 1 <= xe and sy - 1 == y -> true
+        _else -> false
+      end
+    end)
+  end
+
+  def parse(<<char::binary-size(1), rest::binary>>, acc) do
+    {x, y} = Map.get(acc, :position)
+
+    case chartype(char) do
+      :eol ->
+        acc = Map.update!(acc, :numbers, fn list -> list ++ [Map.get(acc, :number)] end)
+        acc = Map.delete(acc, :number)
+        acc = Map.update!(acc, :position, fn {_x, y} -> {0, y + 1} end)
+        parse(rest, acc)
+
+      :dot ->
+        acc = Map.update!(acc, :numbers, fn list -> list ++ [Map.get(acc, :number)] end)
+        acc = Map.delete(acc, :number)
+        acc = Map.update!(acc, :position, fn {x, y} -> {x + 1, y} end)
+        parse(rest, acc)
+
+      :number ->
+        acc =
+          Map.update(acc, :number, {char, x, x, y}, fn {number, xs, xe, y} ->
+            {number <> char, xs, xe + 1, y}
+          end)
+
+        acc = Map.update!(acc, :position, fn {x, y} -> {x + 1, y} end)
+        parse(rest, acc)
+
+      :symbol ->
+        acc = Map.update!(acc, :numbers, fn list -> list ++ [Map.get(acc, :number)] end)
+        acc = Map.delete(acc, :number)
+
+        acc =
+          Map.update(acc, :symbols, [{char, x, y}], fn symbols -> symbols ++ [{char, x, y}] end)
+
+        acc = Map.update!(acc, :position, fn {x, y} -> {x + 1, y} end)
+        parse(rest, acc)
+    end
+  end
+
+  def parse(<<"", _rest::binary>>, acc) do
+    acc =
+      Map.update!(acc, :numbers, fn list ->
+        (list ++ [Map.get(acc, :number)]) |> Enum.filter(& &1)
+      end)
+
+    Map.delete(acc, :number)
+  end
+
+  defp chartype("."), do: :dot
+  defp chartype("\n"), do: :eol
+
+  defp chartype(other) do
+    case Enum.member?(~w/1 2 3 4 5 6 7 8 9 0/, other) do
+      true -> :number
+      false -> :symbol
+    end
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+warning: variable "number" is unused (if the variable is not meant to be used, prefix it with an underscore)
+  advent.livemd#cell:y2754aqflmljdaubobirv43b5vfx5p24:14: Day3Part2.find_numbers_for/2
+
+warning: variable "symbol" is unused (if the variable is not meant to be used, prefix it with an underscore)
+  advent.livemd#cell:y2754aqflmljdaubobirv43b5vfx5p24:12: Day3Part2.find_numbers_for/2
+
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Day3Part2, <<70, 79, 82, 49, 0, 0, 28, ...>>, {:chartype, 1}}
+```
+
+```elixir
+Day3Part2.solve(d3p2example)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+467835
+```
+
+```elixir
+Day3Part2.solve(File.read!("d3.txt"))
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+85010461
+```
+
+## Day 4
+
+```elixir
+day4example1 = """
+Card 1: 41 48 83 86 17 | 83 86  6 31 17  9 48 53
+Card 2: 13 32 20 16 61 | 61 30 68 82 17 32 24 19
+Card 3:  1 21 53 59 44 | 69 82 63 72 16 21 14  1
+Card 4: 41 92 73 84 69 | 59 84 76 51 58  5 54 83
+Card 5: 87 83 26 28 32 | 88 30 70 12 93 22 82 36
+Card 6: 31 18 13 56 72 | 74 77 10 23 35 67 36 11
+"""
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+"Card 1: 41 48 83 86 17 | 83 86  6 31 17  9 48 53\nCard 2: 13 32 20 16 61 | 61 30 68 82 17 32 24 19\nCard 3:  1 21 53 59 44 | 69 82 63 72 16 21 14  1\nCard 4: 41 92 73 84 69 | 59 84 76 51 58  5 54 83\nCard 5: 87 83 26 28 32 | 88 30 70 12 93 22 82 36\nCard 6: 31 18 13 56 72 | 74 77 10 23 35 67 36 11\n"
+```
+
+```elixir
+defmodule Day4Part1 do
+  def solve(input) do
+    input
+    |> String.split("\n", trim: true)
+    |> Enum.map(&parse_card/1)
+    |> Enum.map(fn {s1, s2} -> MapSet.intersection(s1, s2) end)
+    |> Enum.reject(&(MapSet.size(&1) == 0))
+    |> Enum.reduce(0, fn set, acc -> acc + :math.pow(2, MapSet.size(set) - 1) end)
+  end
+
+  def parse_card(input) do
+    [x, y] =
+      input
+      |> String.split(":", trim: true)
+      |> List.last()
+      |> String.split("|", trim: true)
+      |> Enum.map(fn nums ->
+        String.split(nums, " ", trim: true)
+        |> Enum.map(&String.to_integer/1)
+      end)
+
+    {MapSet.new(x), MapSet.new(y)}
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Day4Part1, <<70, 79, 82, 49, 0, 0, 12, ...>>, {:parse_card, 1}}
+```
+
+```elixir
+Day4Part1.solve(day4example1)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+13.0
+```
+
+```elixir
+Day4Part1.solve(File.read!("d4.txt"))
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+18519.0
+```
+
+```elixir
+defmodule Day4Part2 do
+  def solve(input) do
+    cards =
+      input
+      |> String.split("\n", trim: true)
+      |> Enum.map(&parse_card/1)
+      |> Enum.with_index(fn {s1, s2}, index ->
+        {index, {MapSet.intersection(s1, s2) |> MapSet.size(), 1}}
+      end)
+      |> Enum.into(%{})
+
+    cards =
+      for x <- 0..(length(Map.values(cards)) - 1), reduce: cards do
+        acc ->
+          case Map.get(acc, x) do
+            {0, _copies} ->
+              acc
+
+            {matching, copies} ->
+              for i <- 1..matching, reduce: acc do
+                acc ->
+                  Map.update!(acc, x + i, fn {matching, count} -> {matching, count + copies} end)
+              end
+          end
+      end
+
+    Enum.reduce(cards, 0, fn {_key, {_, count}}, acc -> acc + count end)
+  end
+
+  def parse_card(input) do
+    [x, y] =
+      input
+      |> String.split(":", trim: true)
+      |> List.last()
+      |> String.split("|", trim: true)
+      |> Enum.map(fn nums ->
+        String.split(nums, " ", trim: true)
+        |> Enum.map(&String.to_integer/1)
+      end)
+
+    {MapSet.new(x), MapSet.new(y)}
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Day4Part2, <<70, 79, 82, 49, 0, 0, 15, ...>>, {:parse_card, 1}}
+```
+
+```elixir
+Day4Part2.solve(day4example1)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+30
+```
+
+```elixir
+Day4Part2.solve(File.read!("d4.txt"))
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+11787590
+```
