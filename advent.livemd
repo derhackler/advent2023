@@ -593,3 +593,420 @@ Day4Part2.solve(File.read!("d4.txt"))
 ```
 11787590
 ```
+
+## Day 5
+
+```elixir
+day5example1 = """
+seeds: 79 14 55 13
+
+seed-to-soil map:
+50 98 2
+52 50 48
+
+soil-to-fertilizer map:
+0 15 37
+37 52 2
+39 0 15
+
+fertilizer-to-water map:
+49 53 8
+0 11 42
+42 0 7
+57 7 4
+
+water-to-light map:
+88 18 7
+18 25 70
+
+light-to-temperature map:
+45 77 23
+81 45 19
+68 64 13
+
+temperature-to-humidity map:
+0 69 1
+1 0 69
+
+humidity-to-location map:
+60 56 37
+56 93 4
+"""
+
+:ok
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:ok
+```
+
+```elixir
+defmodule Day5Part1 do
+  def solve(input) do
+    {seeds, map} = parse(input)
+
+    locations =
+      for seed <- seeds do
+        Enum.reduce_while(1..100, {"seed", seed}, fn
+          _, {"location", number} ->
+            {:halt, number}
+
+          _, {type, number} ->
+            {to, lookups} = map[type]
+
+            lookups
+            |> Enum.find_value({:cont, {to, number}}, fn lookup ->
+              case lookup do
+                {dest, source, len} when source <= number and source + len >= number ->
+                  {:cont, {to, dest + (number - source)}}
+
+                _ ->
+                  nil
+              end
+            end)
+        end)
+      end
+
+    Enum.min(locations)
+  end
+
+  def parse(input) do
+    [seeds | map] = String.split(input, "\n\n", trim: true)
+
+    seeds =
+      seeds
+      |> String.split([":", " "], trim: true)
+      |> tl()
+      |> Enum.map(&String.to_integer/1)
+
+    map = map |> Enum.map(&parse_map/1) |> Enum.into(%{})
+
+    {seeds, map}
+  end
+
+  def parse_map(input) do
+    [info | ranges] = String.split(input, "\n", trim: true)
+    [from, _, to, _] = String.split(info, ["-", " "], trim: true)
+
+    map =
+      ranges
+      |> Enum.map(fn x -> String.split(x, " ") |> Enum.map(&String.to_integer/1) end)
+      |> Enum.map(fn [dest, source, len] -> {dest, source, len} end)
+
+    {from, {to, map}}
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Day5Part1, <<70, 79, 82, 49, 0, 0, 16, ...>>, {:parse_map, 1}}
+```
+
+```elixir
+Day5Part1.solve(day5example1)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+35
+```
+
+```elixir
+Day5Part1.solve(File.read!("d5.txt"))
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+346433842
+```
+
+```elixir
+defmodule Day5Part2 do
+  def solve(input) do
+    {seeds, map} = parse(input)
+
+    {_to, mappers} = map["seed"]
+
+    locations =
+      for seed <- seeds do
+        dbg(seed)
+
+        reduce_range("seed", map, seed, mappers)
+        |> List.flatten()
+
+        # |> Enum.min_by(fn {loc,_len} -> loc end)
+      end
+
+    # Enum.min(locations)
+
+    # locations =
+    #   seeds
+    #   |> Enum.map(fn seed ->
+    #     {to, mappers} = map["seed"]
+    #     reduce_range(to, map, seed, mappers)
+    #   end)
+
+    # Enum.min(locations)
+  end
+
+  def reduce_range(_type, _map, {_number, rangelength} = _seed, _mappers) when rangelength < 1 do
+    nil
+  end
+
+  def reduce_range("location", _map, seed, _mappers) do
+    seed
+  end
+
+  def reduce_range(type, map, {_number, _rangelength} = seed, []) do
+    {to, new_mappers} = map[type]
+    reduce_range(to, map, seed, new_mappers)
+  end
+
+  def reduce_range(type, map, {_number, _rangelength} = seed, [{dest, source, len} | mappers]) do
+    {to, new_mappers} = map[type]
+
+    {number, rangelength} = seed
+
+    # dbg({dest,source,len, number, source-number})
+    # dbg({source+len, rangelength - (source - number)})
+    [
+      reduce_range(to, map, {number, source - number}, new_mappers),
+      reduce_range(to, map, {dest, min(rangelength - (source - number), len)}, new_mappers),
+      reduce_range(type, map, {source + len, rangelength - (source - number) - len}, mappers)
+    ]
+  end
+
+  def parse(input) do
+    [seeds | map] = String.split(input, "\n\n", trim: true)
+
+    seeds =
+      seeds
+      |> String.split([":", " "], trim: true)
+      |> tl()
+      |> Enum.map(&String.to_integer/1)
+      |> Enum.chunk_every(2)
+      |> Enum.map(fn [seed, len] -> {seed, len} end)
+
+    map = map |> Enum.map(&parse_map/1) |> Enum.into(%{})
+
+    {seeds, map}
+  end
+
+  def parse_map(input) do
+    [info | ranges] = String.split(input, "\n", trim: true)
+    [from, _, to, _] = String.split(info, ["-", " "], trim: true)
+
+    map =
+      ranges
+      |> Enum.map(fn x -> String.split(x, " ") |> Enum.map(&String.to_integer/1) end)
+      |> Enum.map(fn [dest, source, len] -> {dest, source, len} end)
+      |> Enum.sort_by(fn {_dest, source, _len} -> source end)
+
+    {from, {to, map}}
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+warning: variable "locations" is unused (if the variable is not meant to be used, prefix it with an underscore)
+  advent.livemd#cell:4s5f4rynub5cowi6dmhxpoojodcnv3vz:7: Day5Part2.solve/1
+
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Day5Part2, <<70, 79, 82, 49, 0, 0, 20, ...>>, {:parse_map, 1}}
+```
+
+```elixir
+{seeds, map} = Day5Part2.parse(day5example1)
+
+{_to, mappers} = map["seed"]
+
+locations =
+  for seed <- [hd(seeds)] do
+    Day5Part2.reduce_range("seed", map, seed, mappers)
+    |> List.flatten()
+    |> Enum.filter(& &1)
+    |> Enum.min_by(fn {loc, _len} -> loc end)
+  end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[{0, 1}]
+```
+
+```elixir
+{seeds, map} =
+  {[{49, 7}],
+   %{
+     "seed" => {"foo", [{100, 50, 2}, {10, 53, 1}]},
+     "foo" => {"location", [{100, 50, 2}, {10, 53, 1}]}
+   }}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{[{49, 7}],
+ %{
+   "foo" => {"location", [{100, 50, 2}, {10, 53, 1}]},
+   "seed" => {"foo", [{100, 50, 2}, {10, 53, 1}]}
+ }}
+```
+
+```elixir
+{to, ranges} = map["seed"]
+
+Day5Part2.reduce_range("seed", map, hd(seeds), ranges)
+|> List.flatten()
+|> Enum.filter(& &1)
+|> Enum.min_by(fn {loc, _len} -> loc end)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{10, 1}
+```
+
+```elixir
+Day5Part2.solve(day5example1)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[advent.livemd#cell:4s5f4rynub5cowi6dmhxpoojodcnv3vz:8: Day5Part2.solve/1]
+seed #=> {79, 14}
+
+[advent.livemd#cell:4s5f4rynub5cowi6dmhxpoojodcnv3vz:8: Day5Part2.solve/1]
+seed #=> {55, 13}
+
+
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[
+  [
+    nil,
+    nil,
+    nil,
+    nil,
+    nil,
+    nil,
+    nil,
+    {1, 69},
+    nil,
+    {0, 1},
+    {70, 30},
+    nil,
+    nil,
+    {1, 69},
+    nil,
+    {0, 1},
+    {70, 11},
+    nil,
+    nil,
+    {1, 63},
+    nil,
+    nil,
+    nil,
+    nil,
+    {1, 45},
+    nil,
+    nil,
+    nil,
+    nil,
+    nil,
+    nil,
+    nil,
+    nil,
+    {1, 69},
+    nil,
+    {0, 1},
+    {70, 30},
+    nil,
+    nil,
+    {1, 69},
+    nil,
+    {0, 1},
+    {70, 11},
+    nil,
+    nil,
+    {1, 63},
+    nil,
+    nil,
+    nil,
+    ...
+  ],
+  [
+    nil,
+    nil,
+    nil,
+    nil,
+    nil,
+    nil,
+    nil,
+    {1, 69},
+    nil,
+    {0, 1},
+    {70, 30},
+    nil,
+    nil,
+    {1, 69},
+    nil,
+    {0, 1},
+    {70, 11},
+    nil,
+    nil,
+    {1, 63},
+    nil,
+    nil,
+    nil,
+    nil,
+    {1, 45},
+    nil,
+    nil,
+    nil,
+    nil,
+    nil,
+    nil,
+    nil,
+    nil,
+    {1, 69},
+    nil,
+    {0, 1},
+    {70, 30},
+    nil,
+    nil,
+    {1, 69},
+    nil,
+    {0, 1},
+    {70, 11},
+    nil,
+    nil,
+    {1, 63},
+    nil,
+    nil,
+    ...
+  ]
+]
+```
+
+```elixir
+Day5Part2.solve(File.read!("d5.txt"))
+```
