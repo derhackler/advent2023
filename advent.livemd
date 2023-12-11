@@ -276,7 +276,7 @@ end
 
 ```
 warning: variable "number" is unused (if the variable is not meant to be used, prefix it with an underscore)
-  advent.livemd#cell:3yyixuzc4yg6zlpoyv7i6a6uc4yygvwc:9: Day3Part1.find_symbol_for/2
+  advent.livemd#cell:gu6fv2wg7nozmcutnlask3ho46h5borh:10: Day3Part1.find_symbol_for/2
 
 ```
 
@@ -417,10 +417,10 @@ end
 
 ```
 warning: variable "number" is unused (if the variable is not meant to be used, prefix it with an underscore)
-  advent.livemd#cell:y2754aqflmljdaubobirv43b5vfx5p24:14: Day3Part2.find_numbers_for/2
+  advent.livemd#cell:uv4zlggmeygur42pss4vosa5ktwm4ejm:17: Day3Part2.find_numbers_for/2
 
 warning: variable "symbol" is unused (if the variable is not meant to be used, prefix it with an underscore)
-  advent.livemd#cell:y2754aqflmljdaubobirv43b5vfx5p24:12: Day3Part2.find_numbers_for/2
+  advent.livemd#cell:uv4zlggmeygur42pss4vosa5ktwm4ejm:15: Day3Part2.find_numbers_for/2
 
 ```
 
@@ -733,26 +733,12 @@ defmodule Day5Part2 do
 
     {_to, mappers} = map["seed"]
 
-    locations =
-      for seed <- seeds do
-        dbg(seed)
-
-        reduce_range("seed", map, seed, mappers)
-        |> List.flatten()
-
-        # |> Enum.min_by(fn {loc,_len} -> loc end)
-      end
-
-    # Enum.min(locations)
-
-    # locations =
-    #   seeds
-    #   |> Enum.map(fn seed ->
-    #     {to, mappers} = map["seed"]
-    #     reduce_range(to, map, seed, mappers)
-    #   end)
-
-    # Enum.min(locations)
+    for seed <- seeds do
+      reduce_range("seed", map, seed, mappers)
+      |> List.flatten()
+      |> Enum.filter(& &1)
+      |> Enum.min_by(fn {loc, _len} -> loc end)
+    end
   end
 
   def reduce_range(_type, _map, {_number, rangelength} = _seed, _mappers) when rangelength < 1 do
@@ -760,26 +746,73 @@ defmodule Day5Part2 do
   end
 
   def reduce_range("location", _map, seed, _mappers) do
+    IO.inspect(seed, label: "from location")
     seed
   end
 
-  def reduce_range(type, map, {_number, _rangelength} = seed, []) do
+  def reduce_range(type, map, seed, []) do
     {to, new_mappers} = map[type]
+    IO.inspect(seed, label: "from #{type} to #{to}")
     reduce_range(to, map, seed, new_mappers)
   end
 
-  def reduce_range(type, map, {_number, _rangelength} = seed, [{dest, source, len} | mappers]) do
-    {to, new_mappers} = map[type]
+  def reduce_range(
+        type,
+        map,
+        seed,
+        [{dest, source, len} | remaining_mappers] = allmappers
+      ) do
+    # dbg()
+    # dbg(:working)
 
+    {to, new_mappers} = map[type]
     {number, rangelength} = seed
 
-    # dbg({dest,source,len, number, source-number})
-    # dbg({source+len, rangelength - (source - number)})
-    [
-      reduce_range(to, map, {number, source - number}, new_mappers),
-      reduce_range(to, map, {dest, min(rangelength - (source - number), len)}, new_mappers),
-      reduce_range(type, map, {source + len, rangelength - (source - number) - len}, mappers)
-    ]
+    IO.inspect(seed, label: "from #{type} to #{to}")
+
+    # the first number not in the mapper anymore
+    mapper_end = source + len
+    nums_before_mapper = min(rangelength, max(0, source - number))
+    nums_remaining = max(0, rangelength - nums_before_mapper)
+    # how many nums are in the mapper
+    nums_in_mapper = max(0, min(mapper_end - number, nums_remaining))
+    nums_after_mapper = rangelength - (nums_before_mapper + nums_in_mapper)
+    start_in_mapper = max(source, number + nums_before_mapper)
+    mapped_start = dest + start_in_mapper - source
+
+    # dbg({
+    #   mapper_end,
+    #   nums_before_mapper,
+    #   nums_remaining,
+    #   nums_in_mapper,
+    #   nums_after_mapper,
+    #   start_in_mapper,
+    #   mapped_start
+    # })
+
+    cond do
+      # there are seeds before the mapper. map the first pass on the remaining.
+      nums_before_mapper > 0 ->
+        # dbg("map before")
+        [
+          reduce_range(to, map, {number, nums_before_mapper}, new_mappers),
+          reduce_range(type, map, {source, nums_remaining}, allmappers)
+        ]
+
+      # all seeds are all behind the mapper -> try the next mapper
+      nums_in_mapper == 0 ->
+        # dbg("map after")
+        reduce_range(type, map, seed, remaining_mappers)
+
+      # some seeds are in the mapper
+      true ->
+        # dbg("actual map")
+
+        [
+          reduce_range(to, map, {mapped_start, nums_in_mapper}, new_mappers),
+          reduce_range(type, map, {mapper_end, nums_after_mapper}, remaining_mappers)
+        ]
+    end
   end
 
   def parse(input) do
@@ -816,69 +849,270 @@ end
 <!-- livebook:{"output":true} -->
 
 ```
-warning: variable "locations" is unused (if the variable is not meant to be used, prefix it with an underscore)
-  advent.livemd#cell:4s5f4rynub5cowi6dmhxpoojodcnv3vz:7: Day5Part2.solve/1
+{:module, Day5Part2, <<70, 79, 82, 49, 0, 0, 25, ...>>, {:parse_map, 1}}
+```
 
+```elixir
+day5example1 = """
+seeds: 79 14 55 13
+
+seed-to-soil map:
+50 98 2
+52 50 48
+
+soil-to-fertilizer map:
+0 15 37
+37 52 2
+39 0 15
+
+fertilizer-to-water map:
+49 53 8
+0 11 42
+42 0 7
+57 7 4
+
+water-to-light map:
+88 18 7
+18 25 70
+
+light-to-temperature map:
+45 77 23
+81 45 19
+68 64 13
+
+temperature-to-humidity map:
+0 69 1
+1 0 69
+
+humidity-to-location map:
+60 56 37
+56 93 4
+"""
+
+:ok
 ```
 
 <!-- livebook:{"output":true} -->
 
 ```
-{:module, Day5Part2, <<70, 79, 82, 49, 0, 0, 20, ...>>, {:parse_map, 1}}
+:ok
 ```
 
 ```elixir
 {seeds, map} = Day5Part2.parse(day5example1)
-
-{_to, mappers} = map["seed"]
-
-locations =
-  for seed <- [hd(seeds)] do
-    Day5Part2.reduce_range("seed", map, seed, mappers)
-    |> List.flatten()
-    |> Enum.filter(& &1)
-    |> Enum.min_by(fn {loc, _len} -> loc end)
-  end
 ```
 
 <!-- livebook:{"output":true} -->
 
 ```
-[{0, 1}]
-```
-
-```elixir
-{seeds, map} =
-  {[{49, 7}],
-   %{
-     "seed" => {"foo", [{100, 50, 2}, {10, 53, 1}]},
-     "foo" => {"location", [{100, 50, 2}, {10, 53, 1}]}
-   }}
-```
-
-<!-- livebook:{"output":true} -->
-
-```
-{[{49, 7}],
+{[{79, 14}, {55, 13}],
  %{
-   "foo" => {"location", [{100, 50, 2}, {10, 53, 1}]},
-   "seed" => {"foo", [{100, 50, 2}, {10, 53, 1}]}
+   "fertilizer" => {"water", [{42, 0, 7}, {57, 7, 4}, {0, 11, 42}, {49, 53, 8}]},
+   "humidity" => {"location", [{60, 56, 37}, {56, 93, 4}]},
+   "light" => {"temperature", [{81, 45, 19}, {68, 64, 13}, {45, 77, 23}]},
+   "seed" => {"soil", [{52, 50, 48}, {50, 98, 2}]},
+   "soil" => {"fertilizer", [{39, 0, 15}, {0, 15, 37}, {37, 52, 2}]},
+   "temperature" => {"humidity", [{1, 0, 69}, {0, 69, 1}]},
+   "water" => {"light", [{88, 18, 7}, {18, 25, 70}]}
  }}
 ```
 
 ```elixir
 {to, ranges} = map["seed"]
 
-Day5Part2.reduce_range("seed", map, hd(seeds), ranges)
+Day5Part2.reduce_range("seed", map, {82, 1}, ranges)
 |> List.flatten()
 |> Enum.filter(& &1)
-|> Enum.min_by(fn {loc, _len} -> loc end)
+
+# |> Enum.min_by(fn {loc, _len} -> loc end)
 ```
 
 <!-- livebook:{"output":true} -->
 
 ```
-{10, 1}
+from seed to soil: {82, 1}
+from soil to fertilizer: {84, 1}
+from fertilizer to water: {86, 1}
+from fertilizer to water: {86, 1}
+from fertilizer to water: {86, 1}
+from fertilizer to water: {86, 1}
+from water to light: {86, 1}
+from water to light: {86, 1}
+from water to light: {86, 1}
+from water to light: {86, 1}
+from water to light: {86, 1}
+from light to temperature: {86, 1}
+from light to temperature: {86, 1}
+from temperature to humidity: {79, 1}
+from temperature to humidity: {79, 1}
+from temperature to humidity: {79, 1}
+from humidity to location: {47, 1}
+from location: {48, 1}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[{48, 1}]
+```
+
+```elixir
+# |x  x  x  x  x  x  x |
+# |  |=====|  |========|
+# 49 50 51 52 53 54 55 56 57
+{seeds, map} =
+  {[{49, 7}],
+   %{
+     "seed" => {"foo", [{100, 50, 2}, {0, 53, 3}]},
+     "foo" => {"location", [{500, 0, 10}, {100, 50, 2}, {10, 53, 3}]}
+   }}
+
+# reduce_range(type, map, {_number, _rangelength} = seed, [{dest, source, len} | mappers])
+
+{to, ranges} = map["seed"]
+
+Day5Part2.reduce_range("seed", map, hd(seeds), ranges)
+|> List.flatten()
+|> Enum.filter(& &1)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+from seed to foo: {49, 7}
+from foo to location: {49, 1}
+from location: {49, 1}
+from seed to foo: {50, 6}
+from foo to location: {100, 2}
+from foo to location: {100, 2}
+from foo to location: {100, 2}
+from location: {100, 2}
+from seed to foo: {52, 4}
+from foo to location: {52, 1}
+from foo to location: {52, 1}
+from location: {52, 1}
+from seed to foo: {53, 3}
+from foo to location: {0, 3}
+from location: {0, 3}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[{49, 1}, {100, 2}, {52, 1}, {0, 3}]
+```
+
+```elixir
+# mapper_end = source+len # the first number not in the mapper anymore
+# nums_before_mapper = min(rangelength, max(0, source - number))
+# nums_remaining = max(0,rangelength - nums_before_mapper)
+# nums_in_mapper = max(0, min(mapper_end - number, nums_remaining)) # how many nums are in the mapper
+# nums_after_mapper = rangelength - (nums_before_mapper + nums_in_mapper)
+# start_in_mapper = max(source, number+nums_before_mapper)
+# mapped_start = dest + start_in_mapper - source
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+nil
+```
+
+```elixir
+# seed, expected outcome
+map = %{"seed" => {"location", [{200, 50, 5}]}}
+
+tests = [
+  {{0, 10}, [{0, 10}]},
+  {{0, 50}, [{0, 50}]},
+  {{49, 2}, [{49, 1}, {200, 1}]},
+  {{49, 6}, [{49, 1}, {200, 5}]},
+  {{49, 7}, [{49, 1}, {200, 5}, {55, 1}]},
+  {{49, 30}, [{49, 1}, {200, 5}, {55, 24}]},
+  {{50, 1}, [{200, 1}]},
+  {{50, 5}, [{200, 5}]},
+  {{50, 6}, [{200, 5}, {55, 1}]},
+  {{52, 3}, [{202, 3}]},
+  {{54, 4}, [{204, 1}, {55, 3}]},
+  {{54, 20}, [{204, 1}, {55, 19}]}
+]
+
+ranges = [{200, 50, 5}]
+
+for {seed, result} <- tests do
+  res =
+    Day5Part2.reduce_range("seed", map, seed, ranges)
+    |> List.flatten()
+    |> Enum.filter(& &1)
+
+  {res, result}
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+from seed to location: {0, 10}
+from location: {0, 10}
+from seed to location: {0, 50}
+from location: {0, 50}
+from seed to location: {49, 2}
+from location: {49, 1}
+from seed to location: {50, 1}
+from location: {200, 1}
+from seed to location: {49, 6}
+from location: {49, 1}
+from seed to location: {50, 5}
+from location: {200, 5}
+from seed to location: {49, 7}
+from location: {49, 1}
+from seed to location: {50, 6}
+from location: {200, 5}
+from seed to location: {55, 1}
+from location: {55, 1}
+from seed to location: {49, 30}
+from location: {49, 1}
+from seed to location: {50, 29}
+from location: {200, 5}
+from seed to location: {55, 24}
+from location: {55, 24}
+from seed to location: {50, 1}
+from location: {200, 1}
+from seed to location: {50, 5}
+from location: {200, 5}
+from seed to location: {50, 6}
+from location: {200, 5}
+from seed to location: {55, 1}
+from location: {55, 1}
+from seed to location: {52, 3}
+from location: {202, 3}
+from seed to location: {54, 4}
+from location: {204, 1}
+from seed to location: {55, 3}
+from location: {55, 3}
+from seed to location: {54, 20}
+from location: {204, 1}
+from seed to location: {55, 19}
+from location: {55, 19}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[
+  {[{0, 10}], [{0, 10}]},
+  {[{0, 50}], [{0, 50}]},
+  {[{49, 1}, {200, 1}], [{49, 1}, {200, 1}]},
+  {[{49, 1}, {200, 5}], [{49, 1}, {200, 5}]},
+  {[{49, 1}, {200, 5}, {55, 1}], [{49, 1}, {200, 5}, {55, 1}]},
+  {[{49, 1}, {200, 5}, {55, 24}], [{49, 1}, {200, 5}, {55, 24}]},
+  {[{200, 1}], [{200, 1}]},
+  {[{200, 5}], [{200, 5}]},
+  {[{200, 5}, {55, 1}], [{200, 5}, {55, 1}]},
+  {[{202, 3}], [{202, 3}]},
+  {[{204, 1}, {55, 3}], [{204, 1}, {55, 3}]},
+  {[{204, 1}, {55, 19}], [{204, 1}, {55, 19}]}
+]
 ```
 
 ```elixir
@@ -888,12 +1122,1405 @@ Day5Part2.solve(day5example1)
 <!-- livebook:{"output":true} -->
 
 ```
-[advent.livemd#cell:4s5f4rynub5cowi6dmhxpoojodcnv3vz:8: Day5Part2.solve/1]
-seed #=> {79, 14}
+from seed to soil: {79, 14}
+from soil to fertilizer: {81, 14}
+from fertilizer to water: {83, 14}
+from fertilizer to water: {83, 14}
+from fertilizer to water: {83, 14}
+from fertilizer to water: {83, 14}
+from water to light: {83, 14}
+from water to light: {83, 14}
+from water to light: {83, 14}
+from water to light: {83, 14}
+from water to light: {83, 14}
+from light to temperature: {83, 14}
+from light to temperature: {83, 14}
+from temperature to humidity: {76, 12}
+from temperature to humidity: {76, 12}
+from humidity to location: {80, 1}
+from humidity to location: {80, 1}
+from humidity to location: {80, 1}
+from location: {80, 1}
+from temperature to humidity: {77, 11}
+from humidity to location: {45, 11}
+from location: {46, 11}
+from light to temperature: {95, 2}
+from temperature to humidity: {95, 2}
+from temperature to humidity: {95, 2}
+from temperature to humidity: {95, 2}
+from humidity to location: {63, 2}
+from location: {64, 2}
+from seed to soil: {55, 13}
+from soil to fertilizer: {57, 13}
+from fertilizer to water: {59, 13}
+from fertilizer to water: {59, 13}
+from fertilizer to water: {59, 13}
+from fertilizer to water: {59, 13}
+from water to light: {59, 13}
+from water to light: {59, 13}
+from water to light: {59, 13}
+from water to light: {59, 13}
+from light to temperature: {55, 2}
+from light to temperature: {55, 2}
+from temperature to humidity: {48, 2}
+from humidity to location: {84, 2}
+from humidity to location: {84, 2}
+from humidity to location: {84, 2}
+from location: {84, 2}
+from water to light: {61, 11}
+from light to temperature: {61, 11}
+from light to temperature: {61, 11}
+from temperature to humidity: {54, 11}
+from humidity to location: {90, 10}
+from humidity to location: {90, 10}
+from humidity to location: {90, 10}
+from location: {90, 10}
+from temperature to humidity: {64, 1}
+from humidity to location: {68, 1}
+from location: {69, 1}
+```
 
-[advent.livemd#cell:4s5f4rynub5cowi6dmhxpoojodcnv3vz:8: Day5Part2.solve/1]
-seed #=> {55, 13}
+<!-- livebook:{"output":true} -->
 
+```
+[{46, 11}, {69, 1}]
+```
+
+```elixir
+Day5Part2.solve(File.read!("d5.txt"))
+|> Enum.sort_by(fn {x, y} -> x end)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+...
+from soil to fertilizer: {3953140805, 155523737}
+from soil to fertilizer: {3953140805, 155523737}
+from soil to fertilizer: {3953140805, 155523737}
+from soil to fertilizer: {3953140805, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from fertilizer to water: {3797617068, 155523737}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from water to light: {4174752997, 120214299}
+from light to temperature: {2330384420, 120214299}
+from light to temperature: {2330384420, 120214299}
+from light to temperature: {2330384420, 120214299}
+from light to temperature: {2330384420, 120214299}
+from light to temperature: {2330384420, 120214299}
+from light to temperature: {2330384420, 120214299}
+from light to temperature: {2330384420, 120214299}
+from light to temperature: {2330384420, 120214299}
+from light to temperature: {2330384420, 120214299}
+from light to temperature: {2330384420, 120214299}
+from temperature to humidity: {1718637673, 120214299}
+from temperature to humidity: {1718637673, 120214299}
+from temperature to humidity: {1718637673, 120214299}
+from temperature to humidity: {1718637673, 120214299}
+from temperature to humidity: {1718637673, 120214299}
+from humidity to location: {2504028491, 120214299}
+from humidity to location: {2504028491, 120214299}
+from humidity to location: {2504028491, 120214299}
+from humidity to location: {2504028491, 120214299}
+from humidity to location: {2504028491, 120214299}
+from humidity to location: {2504028491, 120214299}
+from humidity to location: {2504028491, 120214299}
+from humidity to location: {2504028491, 120214299}
+from humidity to location: {2504028491, 120214299}
+from humidity to location: {2504028491, 120214299}
+from humidity to location: {2504028491, 120214299}
+from humidity to location: {2504028491, 120214299}
+from humidity to location: {2504028491, 120214299}
+from humidity to location: {2504028491, 120214299}
+from humidity to location: {2504028491, 120214299}
+from humidity to location: {2504028491, 120214299}
+from humidity to location: {2504028491, 120214299}
+from humidity to location: {2504028491, 120214299}
+from humidity to location: {2504028491, 120214299}
+from humidity to location: {2504028491, 120214299}
+from location: {2504028491, 120214299}
+from fertilizer to water: {3917831367, 35309438}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from water to light: {3718808665, 31522740}
+from light to temperature: {2210258790, 31522740}
+from light to temperature: {2210258790, 31522740}
+from light to temperature: {2210258790, 31522740}
+from light to temperature: {2210258790, 31522740}
+from light to temperature: {2210258790, 31522740}
+from light to temperature: {2210258790, 31522740}
+from light to temperature: {2210258790, 31522740}
+from light to temperature: {2210258790, 31522740}
+from light to temperature: {2210258790, 31522740}
+from light to temperature: {2210258790, 31522740}
+from temperature to humidity: {1598512043, 31522740}
+from temperature to humidity: {1598512043, 31522740}
+from temperature to humidity: {1598512043, 31522740}
+from temperature to humidity: {1598512043, 31522740}
+from temperature to humidity: {1598512043, 31522740}
+from humidity to location: {2383902861, 31522740}
+from humidity to location: {2383902861, 31522740}
+from humidity to location: {2383902861, 31522740}
+from humidity to location: {2383902861, 31522740}
+from humidity to location: {2383902861, 31522740}
+from humidity to location: {2383902861, 31522740}
+from humidity to location: {2383902861, 31522740}
+from humidity to location: {2383902861, 31522740}
+from humidity to location: {2383902861, 31522740}
+from humidity to location: {2383902861, 31522740}
+from humidity to location: {2383902861, 31522740}
+from humidity to location: {2383902861, 31522740}
+from humidity to location: {2383902861, 31522740}
+from humidity to location: {2383902861, 31522740}
+from humidity to location: {2383902861, 31522740}
+from humidity to location: {2383902861, 31522740}
+from humidity to location: {2383902861, 31522740}
+from humidity to location: {2383902861, 31522740}
+from humidity to location: {2383902861, 31522740}
+from location: {442937985, 31522740}
+from fertilizer to water: {3949354107, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from water to light: {2416141229, 3786698}
+from light to temperature: {3766094090, 3786698}
+from light to temperature: {3766094090, 3786698}
+from light to temperature: {3766094090, 3786698}
+from light to temperature: {3766094090, 3786698}
+from light to temperature: {3766094090, 3786698}
+from light to temperature: {3766094090, 3786698}
+from light to temperature: {3766094090, 3786698}
+from light to temperature: {3766094090, 3786698}
+from light to temperature: {3766094090, 3786698}
+from light to temperature: {3766094090, 3786698}
+from light to temperature: {3766094090, 3786698}
+from light to temperature: {3766094090, 3786698}
+from light to temperature: {3766094090, 3786698}
+from temperature to humidity: {2377889945, 3786698}
+from temperature to humidity: {2377889945, 3786698}
+from temperature to humidity: {2377889945, 3786698}
+from temperature to humidity: {2377889945, 3786698}
+from temperature to humidity: {2377889945, 3786698}
+from temperature to humidity: {2377889945, 3786698}
+from temperature to humidity: {2377889945, 3786698}
+from humidity to location: {1826365632, 3786698}
+from humidity to location: {1826365632, 3786698}
+from humidity to location: {1826365632, 3786698}
+from humidity to location: {1826365632, 3786698}
+from humidity to location: {1826365632, 3786698}
+from humidity to location: {1826365632, 3786698}
+from humidity to location: {1826365632, 3786698}
+from humidity to location: {1826365632, 3786698}
+from humidity to location: {1826365632, 3786698}
+from humidity to location: {1826365632, 3786698}
+from humidity to location: {1826365632, 3786698}
+from humidity to location: {1826365632, 3786698}
+from humidity to location: {1826365632, 3786698}
+from location: {1755951470, 3786698}
+from seed to soil: {3869675618, 222061841}
+from soil to fertilizer: {3714151881, 222061841}
+from soil to fertilizer: {3714151881, 222061841}
+from soil to fertilizer: {3714151881, 222061841}
+from soil to fertilizer: {3714151881, 222061841}
+from soil to fertilizer: {3714151881, 222061841}
+from soil to fertilizer: {3714151881, 222061841}
+from soil to fertilizer: {3714151881, 222061841}
+from soil to fertilizer: {3714151881, 222061841}
+from soil to fertilizer: {3714151881, 222061841}
+from soil to fertilizer: {3714151881, 222061841}
+from soil to fertilizer: {3714151881, 222061841}
+from soil to fertilizer: {3714151881, 222061841}
+from soil to fertilizer: {3714151881, 222061841}
+from soil to fertilizer: {3714151881, 222061841}
+from soil to fertilizer: {3714151881, 222061841}
+from soil to fertilizer: {3714151881, 222061841}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from fertilizer to water: {3953140805, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from water to light: {2419927927, 155523737}
+from light to temperature: {3769880788, 7603624}
+from light to temperature: {3769880788, 7603624}
+from light to temperature: {3769880788, 7603624}
+from light to temperature: {3769880788, 7603624}
+from light to temperature: {3769880788, 7603624}
+from light to temperature: {3769880788, 7603624}
+from light to temperature: {3769880788, 7603624}
+from light to temperature: {3769880788, 7603624}
+from light to temperature: {3769880788, 7603624}
+from light to temperature: {3769880788, 7603624}
+from light to temperature: {3769880788, 7603624}
+from light to temperature: {3769880788, 7603624}
+from light to temperature: {3769880788, 7603624}
+from temperature to humidity: {2381676643, 7603624}
+from temperature to humidity: {2381676643, 7603624}
+from temperature to humidity: {2381676643, 7603624}
+from temperature to humidity: {2381676643, 7603624}
+from temperature to humidity: {2381676643, 7603624}
+from temperature to humidity: {2381676643, 7603624}
+from temperature to humidity: {2381676643, 7603624}
+from humidity to location: {1830152330, 7603624}
+from humidity to location: {1830152330, 7603624}
+from humidity to location: {1830152330, 7603624}
+from humidity to location: {1830152330, 7603624}
+from humidity to location: {1830152330, 7603624}
+from humidity to location: {1830152330, 7603624}
+from humidity to location: {1830152330, 7603624}
+from humidity to location: {1830152330, 7603624}
+from humidity to location: {1830152330, 7603624}
+from humidity to location: {1830152330, 7603624}
+from humidity to location: {1830152330, 7603624}
+from humidity to location: {1830152330, 7603624}
+from humidity to location: {1830152330, 7603624}
+from location: {1759738168, 7603624}
+from water to light: {2427531551, 147920113}
+from light to temperature: {3264059981, 147920113}
+from light to temperature: {3264059981, 147920113}
+from light to temperature: {3264059981, 147920113}
+from light to temperature: {3264059981, 147920113}
+from light to temperature: {3264059981, 147920113}
+from light to temperature: {3264059981, 147920113}
+from light to temperature: {3264059981, 147920113}
+from light to temperature: {3264059981, 147920113}
+from light to temperature: {3264059981, 147920113}
+from light to temperature: {3264059981, 147920113}
+from light to temperature: {3264059981, 147920113}
+from light to temperature: {3264059981, 147920113}
+from temperature to humidity: {3654325509, 147920113}
+from temperature to humidity: {3654325509, 147920113}
+from temperature to humidity: {3654325509, 147920113}
+from temperature to humidity: {3654325509, 147920113}
+from temperature to humidity: {3654325509, 147920113}
+from temperature to humidity: {3654325509, 147920113}
+from temperature to humidity: {3654325509, 147920113}
+from temperature to humidity: {3654325509, 147920113}
+from temperature to humidity: {3654325509, 147920113}
+from temperature to humidity: {3654325509, 147920113}
+from temperature to humidity: {3654325509, 147920113}
+from temperature to humidity: {3654325509, 147920113}
+from temperature to humidity: {3654325509, 147920113}
+from temperature to humidity: {3654325509, 147920113}
+from temperature to humidity: {3654325509, 147920113}
+from temperature to humidity: {3654325509, 147920113}
+from temperature to humidity: {3654325509, 147920113}
+from temperature to humidity: {3654325509, 147920113}
+from humidity to location: {3558717552, 27174793}
+from humidity to location: {3558717552, 27174793}
+from humidity to location: {3558717552, 27174793}
+from humidity to location: {3558717552, 27174793}
+from humidity to location: {3558717552, 27174793}
+from humidity to location: {3558717552, 27174793}
+from humidity to location: {3558717552, 27174793}
+from humidity to location: {3558717552, 27174793}
+from humidity to location: {3558717552, 27174793}
+from humidity to location: {3558717552, 27174793}
+from humidity to location: {3558717552, 27174793}
+from humidity to location: {3558717552, 27174793}
+from humidity to location: {3558717552, 27174793}
+from humidity to location: {3558717552, 27174793}
+from humidity to location: {3558717552, 27174793}
+from humidity to location: {3558717552, 27174793}
+from humidity to location: {3558717552, 27174793}
+from humidity to location: {3558717552, 27174793}
+from humidity to location: {3558717552, 27174793}
+from humidity to location: {3558717552, 27174793}
+from humidity to location: {3558717552, 27174793}
+from humidity to location: {3558717552, 27174793}
+from humidity to location: {3558717552, 27174793}
+from humidity to location: {3558717552, 27174793}
+from humidity to location: {3558717552, 27174793}
+from location: {3047902876, 27174793}
+from temperature to humidity: {3681500302, 120745320}
+from humidity to location: {3585892345, 120745320}
+from humidity to location: {3585892345, 120745320}
+from humidity to location: {3585892345, 120745320}
+from humidity to location: {3585892345, 120745320}
+from humidity to location: {3585892345, 120745320}
+from humidity to location: {3585892345, 120745320}
+from humidity to location: {3585892345, 120745320}
+from humidity to location: {3585892345, 120745320}
+from humidity to location: {3585892345, 120745320}
+from humidity to location: {3585892345, 120745320}
+from humidity to location: {3585892345, 120745320}
+from humidity to location: {3585892345, 120745320}
+from humidity to location: {3585892345, 120745320}
+from humidity to location: {3585892345, 120745320}
+from humidity to location: {3585892345, 120745320}
+from humidity to location: {3585892345, 120745320}
+from humidity to location: {3585892345, 120745320}
+from humidity to location: {3585892345, 120745320}
+from humidity to location: {3585892345, 120745320}
+from humidity to location: {3585892345, 120745320}
+from humidity to location: {3585892345, 120745320}
+from humidity to location: {3585892345, 120745320}
+from humidity to location: {3585892345, 120745320}
+from humidity to location: {3585892345, 120745320}
+from humidity to location: {3585892345, 120745320}
+from location: {3075077669, 41430022}
+from humidity to location: {3627322367, 79315298}
+from location: {3340701300, 79315298}
+from soil to fertilizer: {3869675618, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from fertilizer to water: {3714151881, 66538104}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from water to light: {3173122313, 42993878}
+from light to temperature: {3248797860, 15262121}
+from light to temperature: {3248797860, 15262121}
+from light to temperature: {3248797860, 15262121}
+from light to temperature: {3248797860, 15262121}
+from light to temperature: {3248797860, 15262121}
+from light to temperature: {3248797860, 15262121}
+from light to temperature: {3248797860, 15262121}
+from light to temperature: {3248797860, 15262121}
+from light to temperature: {3248797860, 15262121}
+from light to temperature: {3248797860, 15262121}
+from light to temperature: {3248797860, 15262121}
+from light to temperature: {3248797860, 15262121}
+from temperature to humidity: {3639063388, 15262121}
+from temperature to humidity: {3639063388, 15262121}
+from temperature to humidity: {3639063388, 15262121}
+from temperature to humidity: {3639063388, 15262121}
+from temperature to humidity: {3639063388, 15262121}
+from temperature to humidity: {3639063388, 15262121}
+from temperature to humidity: {3639063388, 15262121}
+from temperature to humidity: {3639063388, 15262121}
+from temperature to humidity: {3639063388, 15262121}
+from temperature to humidity: {3639063388, 15262121}
+from temperature to humidity: {3639063388, 15262121}
+from temperature to humidity: {3639063388, 15262121}
+from temperature to humidity: {3639063388, 15262121}
+from temperature to humidity: {3639063388, 15262121}
+from temperature to humidity: {3639063388, 15262121}
+from temperature to humidity: {3639063388, 15262121}
+from temperature to humidity: {3639063388, 15262121}
+from temperature to humidity: {3639063388, 15262121}
+from humidity to location: {3543455431, 15262121}
+from humidity to location: {3543455431, 15262121}
+from humidity to location: {3543455431, 15262121}
+from humidity to location: {3543455431, 15262121}
+from humidity to location: {3543455431, 15262121}
+from humidity to location: {3543455431, 15262121}
+from humidity to location: {3543455431, 15262121}
+from humidity to location: {3543455431, 15262121}
+from humidity to location: {3543455431, 15262121}
+from humidity to location: {3543455431, 15262121}
+from humidity to location: {3543455431, 15262121}
+from humidity to location: {3543455431, 15262121}
+from humidity to location: {3543455431, 15262121}
+from humidity to location: {3543455431, 15262121}
+from humidity to location: {3543455431, 15262121}
+from humidity to location: {3543455431, 15262121}
+from humidity to location: {3543455431, 15262121}
+from humidity to location: {3543455431, 15262121}
+from humidity to location: {3543455431, 15262121}
+from humidity to location: {3543455431, 15262121}
+from humidity to location: {3543455431, 15262121}
+from humidity to location: {3543455431, 15262121}
+from humidity to location: {3543455431, 15262121}
+from humidity to location: {3543455431, 15262121}
+from humidity to location: {3543455431, 15262121}
+from location: {3032640755, 15262121}
+from water to light: {3188384434, 27731757}
+from light to temperature: {937194740, 9817881}
+from light to temperature: {937194740, 9817881}
+from light to temperature: {937194740, 9817881}
+from light to temperature: {937194740, 9817881}
+from temperature to humidity: {170366357, 9817881}
+from humidity to location: {565463374, 9817881}
+from humidity to location: {565463374, 9817881}
+from humidity to location: {565463374, 9817881}
+from humidity to location: {565463374, 9817881}
+from location: {1581223170, 9817881}
+from water to light: {3198202315, 17913876}
+from light to temperature: {4209708615, 17913876}
+from light to temperature: {4209708615, 17913876}
+from light to temperature: {4209708615, 17913876}
+from light to temperature: {4209708615, 17913876}
+from light to temperature: {4209708615, 17913876}
+from light to temperature: {4209708615, 17913876}
+from light to temperature: {4209708615, 17913876}
+from light to temperature: {4209708615, 17913876}
+from light to temperature: {4209708615, 17913876}
+from light to temperature: {4209708615, 17913876}
+from light to temperature: {4209708615, 17913876}
+from light to temperature: {4209708615, 17913876}
+from light to temperature: {4209708615, 17913876}
+from light to temperature: {4209708615, 17913876}
+from light to temperature: {4209708615, 17913876}
+from light to temperature: {4209708615, 17913876}
+from light to temperature: {4209708615, 17913876}
+from temperature to humidity: {1173555538, 17913876}
+from temperature to humidity: {1173555538, 17913876}
+from temperature to humidity: {1173555538, 17913876}
+from temperature to humidity: {1173555538, 17913876}
+from humidity to location: {1574852990, 17913876}
+from humidity to location: {1574852990, 17913876}
+from humidity to location: {1574852990, 17913876}
+from humidity to location: {1574852990, 17913876}
+from humidity to location: {1574852990, 17913876}
+from humidity to location: {1574852990, 17913876}
+from humidity to location: {1574852990, 17913876}
+from humidity to location: {1574852990, 17913876}
+from humidity to location: {1574852990, 17913876}
+from humidity to location: {1574852990, 17913876}
+from humidity to location: {1574852990, 17913876}
+from location: {2167823585, 17913876}
+from fertilizer to water: {3757145759, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from water to light: {4134281688, 23544226}
+from light to temperature: {2591102781, 23544226}
+from light to temperature: {2591102781, 23544226}
+from light to temperature: {2591102781, 23544226}
+from light to temperature: {2591102781, 23544226}
+from light to temperature: {2591102781, 23544226}
+from light to temperature: {2591102781, 23544226}
+from light to temperature: {2591102781, 23544226}
+from light to temperature: {2591102781, 23544226}
+from light to temperature: {2591102781, 23544226}
+from light to temperature: {2591102781, 23544226}
+from temperature to humidity: {1979356034, 23544226}
+from temperature to humidity: {1979356034, 23544226}
+from temperature to humidity: {1979356034, 23544226}
+from temperature to humidity: {1979356034, 23544226}
+from temperature to humidity: {1979356034, 23544226}
+from humidity to location: {2764746852, 23544226}
+from humidity to location: {2764746852, 23544226}
+from humidity to location: {2764746852, 23544226}
+from humidity to location: {2764746852, 23544226}
+from humidity to location: {2764746852, 23544226}
+from humidity to location: {2764746852, 23544226}
+from humidity to location: {2764746852, 23544226}
+from humidity to location: {2764746852, 23544226}
+from humidity to location: {2764746852, 23544226}
+from humidity to location: {2764746852, 23544226}
+from humidity to location: {2764746852, 23544226}
+from humidity to location: {2764746852, 23544226}
+from humidity to location: {2764746852, 23544226}
+from humidity to location: {2764746852, 23544226}
+from humidity to location: {2764746852, 23544226}
+from humidity to location: {2764746852, 23544226}
+from humidity to location: {2764746852, 23544226}
+from humidity to location: {2764746852, 23544226}
+from humidity to location: {2764746852, 23544226}
+from humidity to location: {2764746852, 23544226}
+from humidity to location: {2764746852, 23544226}
+from location: {4235667982, 23544226}
+from seed to soil: {2846055542, 49953829}
+from seed to soil: {2846055542, 49953829}
+from seed to soil: {2846055542, 49953829}
+from seed to soil: {2846055542, 49953829}
+from seed to soil: {2846055542, 49953829}
+from seed to soil: {2846055542, 49953829}
+from seed to soil: {2846055542, 49953829}
+from seed to soil: {2846055542, 49953829}
+from seed to soil: {2846055542, 49953829}
+from seed to soil: {2846055542, 49953829}
+from seed to soil: {2846055542, 49953829}
+from seed to soil: {2846055542, 49953829}
+from seed to soil: {2846055542, 49953829}
+from seed to soil: {2846055542, 49953829}
+from seed to soil: {2846055542, 49953829}
+from seed to soil: {2846055542, 49953829}
+from soil to fertilizer: {2846055542, 49953829}
+from soil to fertilizer: {2846055542, 49953829}
+from soil to fertilizer: {2846055542, 49953829}
+from soil to fertilizer: {2846055542, 49953829}
+from soil to fertilizer: {2846055542, 49953829}
+from soil to fertilizer: {2846055542, 49953829}
+from soil to fertilizer: {2846055542, 49953829}
+from soil to fertilizer: {2846055542, 49953829}
+from soil to fertilizer: {2846055542, 49953829}
+from soil to fertilizer: {2846055542, 49953829}
+from soil to fertilizer: {2846055542, 49953829}
+from soil to fertilizer: {2846055542, 49953829}
+from soil to fertilizer: {2846055542, 49953829}
+from soil to fertilizer: {2846055542, 49953829}
+from soil to fertilizer: {2846055542, 49953829}
+from soil to fertilizer: {2846055542, 49953829}
+from fertilizer to water: {2846055542, 49953829}
+from fertilizer to water: {2846055542, 49953829}
+from fertilizer to water: {2846055542, 49953829}
+from fertilizer to water: {2846055542, 49953829}
+from fertilizer to water: {2846055542, 49953829}
+from fertilizer to water: {2846055542, 49953829}
+from fertilizer to water: {2846055542, 49953829}
+from fertilizer to water: {2846055542, 49953829}
+from fertilizer to water: {2846055542, 49953829}
+from fertilizer to water: {2846055542, 49953829}
+from fertilizer to water: {2846055542, 49953829}
+from fertilizer to water: {2846055542, 49953829}
+from fertilizer to water: {2846055542, 49953829}
+from fertilizer to water: {2846055542, 49953829}
+from fertilizer to water: {2846055542, 49953829}
+from fertilizer to water: {2846055542, 49953829}
+from fertilizer to water: {2846055542, 49953829}
+from fertilizer to water: {2846055542, 49953829}
+from fertilizer to water: {2846055542, 49953829}
+from water to light: {1040326748, 49953829}
+from water to light: {1040326748, 49953829}
+from water to light: {1040326748, 49953829}
+from water to light: {1040326748, 49953829}
+from water to light: {1040326748, 49953829}
+from water to light: {1040326748, 49953829}
+from water to light: {1040326748, 49953829}
+from water to light: {1040326748, 49953829}
+from water to light: {1040326748, 49953829}
+from water to light: {1040326748, 49953829}
+from water to light: {1040326748, 49953829}
+from light to temperature: {737918683, 49953829}
+from light to temperature: {737918683, 49953829}
+from light to temperature: {737918683, 49953829}
+from temperature to humidity: {315365231, 28909700}
+from humidity to location: {710462248, 28909700}
+from humidity to location: {710462248, 28909700}
+from humidity to location: {710462248, 28909700}
+from humidity to location: {710462248, 28909700}
+from humidity to location: {710462248, 28909700}
+from humidity to location: {710462248, 28909700}
+from location: {656974186, 28909700}
+from light to temperature: {766828383, 21044129}
+from temperature to humidity: {0, 21044129}
+from humidity to location: {395097017, 21044129}
+from humidity to location: {395097017, 21044129}
+from humidity to location: {395097017, 21044129}
+from humidity to location: {395097017, 21044129}
+from location: {1410856813, 21044129}
+from seed to soil: {2988140126, 256306471}
+from seed to soil: {2988140126, 256306471}
+from seed to soil: {2988140126, 256306471}
+from seed to soil: {2988140126, 256306471}
+from seed to soil: {2988140126, 256306471}
+from seed to soil: {2988140126, 256306471}
+from seed to soil: {2988140126, 256306471}
+from seed to soil: {2988140126, 256306471}
+from seed to soil: {2988140126, 256306471}
+from seed to soil: {2988140126, 256306471}
+from seed to soil: {2988140126, 256306471}
+from seed to soil: {2988140126, 256306471}
+from seed to soil: {2988140126, 256306471}
+from seed to soil: {2988140126, 256306471}
+from seed to soil: {2988140126, 256306471}
+from seed to soil: {2988140126, 256306471}
+from soil to fertilizer: {2988140126, 256306471}
+from soil to fertilizer: {2988140126, 256306471}
+from soil to fertilizer: {2988140126, 256306471}
+from soil to fertilizer: {2988140126, 256306471}
+from soil to fertilizer: {2988140126, 256306471}
+from soil to fertilizer: {2988140126, 256306471}
+from soil to fertilizer: {2988140126, 256306471}
+from soil to fertilizer: {2988140126, 256306471}
+from soil to fertilizer: {2988140126, 256306471}
+from soil to fertilizer: {2988140126, 256306471}
+from soil to fertilizer: {2988140126, 256306471}
+from soil to fertilizer: {2988140126, 256306471}
+from soil to fertilizer: {2988140126, 256306471}
+from soil to fertilizer: {2988140126, 256306471}
+from soil to fertilizer: {2988140126, 256306471}
+from soil to fertilizer: {2988140126, 256306471}
+from fertilizer to water: {2988140126, 256306471}
+from fertilizer to water: {2988140126, 256306471}
+from fertilizer to water: {2988140126, 256306471}
+from fertilizer to water: {2988140126, 256306471}
+from fertilizer to water: {2988140126, 256306471}
+from fertilizer to water: {2988140126, 256306471}
+from fertilizer to water: {2988140126, 256306471}
+from fertilizer to water: {2988140126, 256306471}
+from fertilizer to water: {2988140126, 256306471}
+from fertilizer to water: {2988140126, 256306471}
+from fertilizer to water: {2988140126, 256306471}
+from fertilizer to water: {2988140126, 256306471}
+from fertilizer to water: {2988140126, 256306471}
+from fertilizer to water: {2988140126, 256306471}
+from fertilizer to water: {2988140126, 256306471}
+from fertilizer to water: {2988140126, 256306471}
+from fertilizer to water: {2988140126, 256306471}
+from fertilizer to water: {2988140126, 256306471}
+from fertilizer to water: {2988140126, 256306471}
+from fertilizer to water: {2988140126, 256306471}
+from fertilizer to water: {2988140126, 256306471}
+from water to light: {1134088300, 154374352}
+from water to light: {1134088300, 154374352}
+from water to light: {1134088300, 154374352}
+from water to light: {1134088300, 154374352}
+from water to light: {1134088300, 154374352}
+from water to light: {1134088300, 154374352}
+from water to light: {1134088300, 154374352}
+from water to light: {1134088300, 154374352}
+from water to light: {1134088300, 154374352}
+from water to light: {1134088300, 154374352}
+from water to light: {1134088300, 154374352}
+from water to light: {1134088300, 154374352}
+from water to light: {1134088300, 154374352}
+from light to temperature: {4123571376, 86137239}
+from light to temperature: {4123571376, 86137239}
+from light to temperature: {4123571376, 86137239}
+from light to temperature: {4123571376, 86137239}
+from light to temperature: {4123571376, 86137239}
+from light to temperature: {4123571376, 86137239}
+from light to temperature: {4123571376, 86137239}
+from light to temperature: {4123571376, 86137239}
+from light to temperature: {4123571376, 86137239}
+from light to temperature: {4123571376, 86137239}
+from light to temperature: {4123571376, 86137239}
+from light to temperature: {4123571376, 86137239}
+from light to temperature: {4123571376, 86137239}
+from light to temperature: {4123571376, 86137239}
+from light to temperature: {4123571376, 86137239}
+from light to temperature: {4123571376, 86137239}
+from light to temperature: {4123571376, 86137239}
+from temperature to humidity: {1087418299, 86137239}
+from temperature to humidity: {1087418299, 86137239}
+from temperature to humidity: {1087418299, 86137239}
+from temperature to humidity: {1087418299, 86137239}
+from humidity to location: {1488715751, 86137239}
+from humidity to location: {1488715751, 86137239}
+from humidity to location: {1488715751, 86137239}
+from humidity to location: {1488715751, 86137239}
+from humidity to location: {1488715751, 86137239}
+from humidity to location: {1488715751, 86137239}
+from humidity to location: {1488715751, 86137239}
+from humidity to location: {1488715751, 86137239}
+from humidity to location: {1488715751, 86137239}
+from humidity to location: {1488715751, 86137239}
+from humidity to location: {1488715751, 86137239}
+from location: {2081686346, 86137239}
+from water to light: {1220225539, 68237113}
+from light to temperature: {1615429560, 68237113}
+from light to temperature: {1615429560, 68237113}
+from light to temperature: {1615429560, 68237113}
+from light to temperature: {1615429560, 68237113}
+from light to temperature: {1615429560, 68237113}
+from light to temperature: {1615429560, 68237113}
+from light to temperature: {1615429560, 68237113}
+from light to temperature: {1615429560, 68237113}
+from light to temperature: {1615429560, 68237113}
+from temperature to humidity: {2652333238, 68237113}
+from temperature to humidity: {2652333238, 68237113}
+from temperature to humidity: {2652333238, 68237113}
+from temperature to humidity: {2652333238, 68237113}
+from temperature to humidity: {2652333238, 68237113}
+from temperature to humidity: {2652333238, 68237113}
+from temperature to humidity: {2652333238, 68237113}
+from humidity to location: {2100808925, 68237113}
+from humidity to location: {2100808925, 68237113}
+from humidity to location: {2100808925, 68237113}
+from humidity to location: {2100808925, 68237113}
+from humidity to location: {2100808925, 68237113}
+from humidity to location: {2100808925, 68237113}
+from humidity to location: {2100808925, 68237113}
+from humidity to location: {2100808925, 68237113}
+from humidity to location: {2100808925, 68237113}
+from humidity to location: {2100808925, 68237113}
+from humidity to location: {2100808925, 68237113}
+from humidity to location: {2100808925, 68237113}
+from humidity to location: {2100808925, 68237113}
+from humidity to location: {2100808925, 68237113}
+from humidity to location: {2100808925, 68237113}
+from humidity to location: {2100808925, 68237113}
+from location: {1954125855, 33369380}
+from humidity to location: {2134178305, 34867733}
+from location: {0, 34867733}
+from fertilizer to water: {3142514478, 101932119}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from water to light: {2761754418, 48813644}
+from light to temperature: {310275755, 48813644}
+from light to temperature: {310275755, 48813644}
+from temperature to humidity: {654550686, 48813644}
+from temperature to humidity: {654550686, 48813644}
+from humidity to location: {177799628, 48813644}
+from humidity to location: {177799628, 48813644}
+from humidity to location: {177799628, 48813644}
+from humidity to location: {177799628, 48813644}
+from location: {1193559424, 48813644}
+from fertilizer to water: {3191328122, 53118475}
+from water to light: {1288462652, 53118475}
+from water to light: {1288462652, 53118475}
+from water to light: {1288462652, 53118475}
+from water to light: {1288462652, 53118475}
+from water to light: {1288462652, 53118475}
+from water to light: {1288462652, 53118475}
+from water to light: {1288462652, 53118475}
+from water to light: {1288462652, 53118475}
+from water to light: {1288462652, 53118475}
+from water to light: {1288462652, 53118475}
+from water to light: {1288462652, 53118475}
+from water to light: {1288462652, 53118475}
+from water to light: {1288462652, 53118475}
+from water to light: {1288462652, 53118475}
+from light to temperature: {1683666673, 53118475}
+from light to temperature: {1683666673, 53118475}
+from light to temperature: {1683666673, 53118475}
+from light to temperature: {1683666673, 53118475}
+from light to temperature: {1683666673, 53118475}
+from light to temperature: {1683666673, 53118475}
+from light to temperature: {1683666673, 53118475}
+from light to temperature: {1683666673, 53118475}
+from light to temperature: {1683666673, 53118475}
+from temperature to humidity: {2720570351, 53118475}
+from temperature to humidity: {2720570351, 53118475}
+from temperature to humidity: {2720570351, 53118475}
+from temperature to humidity: {2720570351, 53118475}
+from temperature to humidity: {2720570351, 53118475}
+from temperature to humidity: {2720570351, 53118475}
+from temperature to humidity: {2720570351, 53118475}
+from humidity to location: {2169046038, 22595277}
+from humidity to location: {2169046038, 22595277}
+from humidity to location: {2169046038, 22595277}
+from humidity to location: {2169046038, 22595277}
+from humidity to location: {2169046038, 22595277}
+from humidity to location: {2169046038, 22595277}
+from humidity to location: {2169046038, 22595277}
+from humidity to location: {2169046038, 22595277}
+from humidity to location: {2169046038, 22595277}
+from humidity to location: {2169046038, 22595277}
+from humidity to location: {2169046038, 22595277}
+from humidity to location: {2169046038, 22595277}
+from humidity to location: {2169046038, 22595277}
+from humidity to location: {2169046038, 22595277}
+from humidity to location: {2169046038, 22595277}
+from humidity to location: {2169046038, 22595277}
+from humidity to location: {2169046038, 22595277}
+from location: {34867733, 22595277}
+from temperature to humidity: {2743165628, 30523198}
+from humidity to location: {1225515387, 1555032}
+from humidity to location: {1225515387, 1555032}
+from humidity to location: {1225515387, 1555032}
+from humidity to location: {1225515387, 1555032}
+from humidity to location: {1225515387, 1555032}
+from humidity to location: {1225515387, 1555032}
+from humidity to location: {1225515387, 1555032}
+from humidity to location: {1225515387, 1555032}
+from location: {2351237987, 1555032}
+from temperature to humidity: {2744720660, 28968166}
+from humidity to location: {0, 28968166}
+from location: {529277565, 19150241}
+from humidity to location: {19150241, 9817925}
+from location: {1060339679, 9817925}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[
+  {0, 34867733},
+  {108826507, 975358},
+  {170125854, 7702103},
+  {187997044, 2662188},
+  {227321686, 19055995},
+  {442937985, 31522740},
+  {656974186, 28909700},
+  {1116116329, 29606291},
+  {1598187509, 24479899},
+  {3451943713, 5858311}
+]
+```
+
+```elixir
+# DAMN!!!! - some bug is creeping around somewhere....
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+nil
+```
+
+## Day 6
+
+```elixir
+day6example1 = """
+Time:      7  15   30
+Distance:  9  40  200
+"""
+
+:ok
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:ok
+```
+
+```elixir
+defmodule Day6Part1 do
+  def solve(input) do
+    parse(input)
+    |> Enum.map(&beat_game/1)
+    |> Enum.product()
+  end
+
+  def beat_game({time, record}) do
+    Range.new(0, time)
+    |> Enum.reduce_while({0, 0}, fn elem, {won, last_dist} ->
+      dist = dist(time, elem)
+
+      cond do
+        dist < last_dist and dist < record -> {:halt, won}
+        dist > record -> {:cont, {won + 1, dist}}
+        true -> {:cont, {won, dist}}
+      end
+    end)
+  end
+
+  def parse(input) do
+    [time, dist] =
+      input
+      |> String.split("\n", trim: true)
+      |> Enum.map(&String.split(&1, " ", trim: true))
+      |> Enum.map(fn [_hd | rest] -> rest |> Enum.map(&String.to_integer/1) end)
+
+    Enum.zip(time, dist)
+  end
+
+  def dist(max_time, hold_for) when hold_for > max_time, do: 0
+
+  def dist(max_time, hold_for) do
+    dist_per_ms = hold_for
+    (max_time - hold_for) * dist_per_ms
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Day6Part1, <<70, 79, 82, 49, 0, 0, 14, ...>>, {:dist, 2}}
+```
+
+```elixir
+Day6Part1.solve(day6example1)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+288
+```
+
+```elixir
+Day6Part1.beat_game({7, 9})
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+4
+```
+
+```elixir
+Day6Part1.dist(7, 6)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+6
+```
+
+```elixir
+Day6Part1.parse(day6example1)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[{7, 9}, {15, 40}, {30, 200}]
+```
+
+```elixir
+Day6Part1.solve(File.read!("d6.txt"))
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+211904
+```
+
+```elixir
+defmodule Day6Part2 do
+  def solve(input) do
+    parse(input)
+    |> beat_game()
+  end
+
+  def beat_game({time, record}) do
+    Range.new(0, time)
+    |> Enum.reduce_while({0, 0}, fn elem, {won, last_dist} ->
+      dist = dist(time, elem)
+
+      cond do
+        dist < last_dist and dist < record -> {:halt, won}
+        dist > record -> {:cont, {won + 1, dist}}
+        true -> {:cont, {won, dist}}
+      end
+    end)
+  end
+
+  def parse(input) do
+    [time, dist] =
+      input
+      |> String.split("\n", trim: true)
+      |> Enum.map(&String.split(&1, " ", trim: true))
+      |> Enum.map(fn [_hd | rest] -> rest |> Enum.join() |> String.to_integer() end)
+
+    {time, dist}
+  end
+
+  def dist(max_time, hold_for) when hold_for > max_time, do: 0
+
+  def dist(max_time, hold_for) do
+    dist_per_ms = hold_for
+    (max_time - hold_for) * dist_per_ms
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Day6Part2, <<70, 79, 82, 49, 0, 0, 13, ...>>, {:dist, 2}}
+```
+
+```elixir
+Day6Part2.parse(day6example1)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{71530, 940200}
+```
+
+```elixir
+Day6Part2.beat_game({71530, 940_200})
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+71503
+```
+
+```elixir
+Day6Part2.solve(File.read!("d6.txt"))
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+43364472
+```
+
+## Day 7
+
+```elixir
+day7example1 = """
+32T3K 765
+T55J5 684
+KK677 28
+KTJJT 220
+QQQJA 483
+"""
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+"32T3K 765\nT55J5 684\nKK677 28\nKTJJT 220\nQQQJA 483\n"
+```
+
+```elixir
+defmodule Day7Part1 do
+  def solve(input) do
+    input
+    |> parse()
+    |> Enum.sort_by(fn {hand, _bid} -> classify(hand) end, &higher?(&1, &2))
+    |> Enum.reverse()
+    |> Enum.reduce({1, 0}, fn {_hand, bid}, {rank, total} -> {rank + 1, total + bid * rank} end)
+  end
+
+  def higher?({rank1, hand1}, {rank2, hand2}) do
+    cond do
+      rank1 > rank2 -> true
+      rank2 > rank1 -> false
+      true -> hand1 > hand2
+    end
+  end
+
+  def parse(input) do
+    input
+    |> String.split("\n", trim: true)
+    |> Enum.map(&String.split(&1, " ", trim: true))
+    |> Enum.map(fn [hand, bid] -> {maphand(hand), String.to_integer(bid)} end)
+  end
+
+  def classify(hand) do
+    freqs =
+      Enum.frequencies(hand)
+      |> Enum.map(& &1)
+      |> Enum.sort_by(fn {_num, freq} -> freq end, :desc)
+
+    case freqs do
+      [{_, 5}] -> {10, hand}
+      [{_, 4}, _] -> {9, hand}
+      [{_, 3}, {_, 2}] -> {8, hand}
+      [{_, 3} | _] -> {7, hand}
+      [{_, 2}, {_, 2}, _] -> {6, hand}
+      [{_, 2} | _] -> {5, hand}
+      _ -> {4, hand}
+    end
+  end
+
+  def maphand(hand) do
+    hand
+    |> String.graphemes()
+    |> Enum.map(&map/1)
+  end
+
+  def map(card) do
+    cards = ~w/2 3 4 5 6 7 8 9 T J Q K A/
+    Enum.find_index(cards, &(&1 == card))
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Day7Part1, <<70, 79, 82, 49, 0, 0, 18, ...>>, {:map, 1}}
+```
+
+```elixir
+Day7Part1.solve(day7example1)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{6, 6440}
+```
+
+```elixir
+cards = Day7Part1.parse(File.read!("d7.txt"))
+
+cards
+|> Enum.map(fn {hand, win} -> Day7Part1.classify(hand) end)
+|> Enum.sort_by(fn {class, range} -> class end)
+|> Enum.filter(fn {rank, hand} -> rank == 7 end)
+|> Enum.take(100)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+warning: variable "win" is unused (if the variable is not meant to be used, prefix it with an underscore)
+  advent.livemd#cell:quaqwgpon354uosb3vo4rfqoja2xw4rl:3
+
+warning: variable "range" is unused (if the variable is not meant to be used, prefix it with an underscore)
+  advent.livemd#cell:quaqwgpon354uosb3vo4rfqoja2xw4rl:4
+
+warning: variable "hand" is unused (if the variable is not meant to be used, prefix it with an underscore)
+  advent.livemd#cell:quaqwgpon354uosb3vo4rfqoja2xw4rl:5
 
 ```
 
@@ -901,112 +2528,408 @@ seed #=> {55, 13}
 
 ```
 [
-  [
-    nil,
-    nil,
-    nil,
-    nil,
-    nil,
-    nil,
-    nil,
-    {1, 69},
-    nil,
-    {0, 1},
-    {70, 30},
-    nil,
-    nil,
-    {1, 69},
-    nil,
-    {0, 1},
-    {70, 11},
-    nil,
-    nil,
-    {1, 63},
-    nil,
-    nil,
-    nil,
-    nil,
-    {1, 45},
-    nil,
-    nil,
-    nil,
-    nil,
-    nil,
-    nil,
-    nil,
-    nil,
-    {1, 69},
-    nil,
-    {0, 1},
-    {70, 30},
-    nil,
-    nil,
-    {1, 69},
-    nil,
-    {0, 1},
-    {70, 11},
-    nil,
-    nil,
-    {1, 63},
-    nil,
-    nil,
-    nil,
-    ...
-  ],
-  [
-    nil,
-    nil,
-    nil,
-    nil,
-    nil,
-    nil,
-    nil,
-    {1, 69},
-    nil,
-    {0, 1},
-    {70, 30},
-    nil,
-    nil,
-    {1, 69},
-    nil,
-    {0, 1},
-    {70, 11},
-    nil,
-    nil,
-    {1, 63},
-    nil,
-    nil,
-    nil,
-    nil,
-    {1, 45},
-    nil,
-    nil,
-    nil,
-    nil,
-    nil,
-    nil,
-    nil,
-    nil,
-    {1, 69},
-    nil,
-    {0, 1},
-    {70, 30},
-    nil,
-    nil,
-    {1, 69},
-    nil,
-    {0, 1},
-    {70, 11},
-    nil,
-    nil,
-    {1, 63},
-    nil,
-    nil,
-    ...
-  ]
+  {7, [8, 9, 8, 8, 1]},
+  {7, [4, 7, 4, 4, 2]},
+  {7, [4, 7, 7, 3, 7]},
+  {7, [1, 7, 4, 4, 4]},
+  {7, [4, 3, 8, 8, 8]},
+  {7, [7, 10, 7, 3, 7]},
+  {7, [9, 0, 0, 0, 6]},
+  {7, [12, 9, 3, 3, 3]},
+  {7, [11, 9, 11, 4, 11]},
+  {7, [2, 12, 0, 12, 12]},
+  {7, [4, 10, 3, 4, 4]},
+  {7, [5, 10, 12, 5, 5]},
+  {7, [12, 7, 0, 7, 7]},
+  {7, [2, 2, 4, 1, 2]},
+  {7, [0, 8, 8, 9, 8]},
+  {7, [1, 1, 7, 1, 2]},
+  {7, ~c"\a\v\f\a\a"},
+  {7, [11, 12, 11, 2, 11]},
+  {7, [2, 7, 1, 7, 7]},
+  {7, [7, 9, 7, 3, 7]},
+  {7, [9, 6, 6, 1, 6]},
+  {7, [9, 4, 4, 4, 7]},
+  {7, [4, 4, 4, 9, 8]},
+  {7, [0, 0, 9, 3, 0]},
+  {7, [4, 6, 8, 6, 6]},
+  {7, [5, 5, 5, 11, 12]},
+  {7, [12, 12, 1, 12, 10]},
+  {7, [8, 3, 2, 3, 3]},
+  {7, [6, 1, 10, 1, 1]},
+  {7, [4, 4, 4, 3, 9]},
+  {7, [8, 11, 11, 4, 11]},
+  {7, [0, 0, 1, 0, 3]},
+  {7, [5, 8, 12, 8, 8]},
+  {7, [2, 7, 7, 7, 10]},
+  {7, [0, 5, 0, 3, 0]},
+  {7, [0, 6, 6, 12, 6]},
+  {7, [3, 9, 12, 12, 12]},
+  {7, [8, 0, 8, 8, 2]},
+  {7, [6, 6, 12, 2, 6]},
+  {7, [8, 1, 12, 12, 12]},
+  {7, [4, 4, 4, 9, 11]},
+  {7, [2, 7, 2, 9, 2]},
+  {7, [1, 5, 1, 1, 3]},
+  {7, ~c"\t\b\f\b\b"},
+  {7, [1, 12, 4, ...]},
+  {7, [2, 2, ...]},
+  {7, [4, ...]},
+  {7, [...]},
+  {7, ...},
+  {...},
+  ...
 ]
 ```
 
 ```elixir
-Day5Part2.solve(File.read!("d5.txt"))
+Day7Part1.solve(File.read!("d7.txt"))
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{1001, 248559379}
+```
+
+```elixir
+x = [10, 6, 5, 1, 0] > [10, 6, 5, 1, 0]
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+false
+```
+
+```elixir
+Day7Part1.classify([6, 5, 4, 3, 2])
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{4, [6, 5, 4, 3, 2]}
+```
+
+```elixir
+Day7Part1.parse(day7example1)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[
+  {[1, 0, 8, 1, 11], 765},
+  {[8, 3, 3, 9, 3], 684},
+  {[11, 11, 4, 5, 5], 28},
+  {~c"\v\b\t\t\b", 220},
+  {~c"\n\n\n\t\f", 483}
+]
+```
+
+```elixir
+Day7Part1.map("2")
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+0
+```
+
+```elixir
+defmodule Day7Part2 do
+  def solve(input) do
+    input
+    |> parse()
+    |> Enum.sort_by(fn {hand, _bid} -> classify(hand) end, &higher?(&1, &2))
+    |> Enum.reverse()
+    |> Enum.reduce({1, 0}, fn {_hand, bid}, {rank, total} -> {rank + 1, total + bid * rank} end)
+  end
+
+  def higher?({rank1, hand1}, {rank2, hand2}) do
+    cond do
+      rank1 > rank2 -> true
+      rank2 > rank1 -> false
+      true -> hand1 > hand2
+    end
+  end
+
+  def parse(input) do
+    input
+    |> String.split("\n", trim: true)
+    |> Enum.map(&String.split(&1, " ", trim: true))
+    |> Enum.map(fn [hand, bid] -> {maphand(hand), String.to_integer(bid)} end)
+  end
+
+  def classify([0, 0, 0, 0, 0] = hand), do: {10, hand}
+
+  def classify(hand) do
+    freqs =
+      Enum.frequencies(hand)
+      |> Enum.map(& &1)
+      |> Enum.into(%{})
+
+    jokers = Map.get(freqs, 0, 0)
+
+    [{mostcard, f} | others] =
+      freqs |> Map.delete(0) |> Enum.sort_by(fn {_num, freq} -> freq end, :desc)
+
+    freqs = [{mostcard, f + jokers} | others]
+
+    case freqs do
+      [{_, 5}] -> {10, hand}
+      [{_, 4}, _] -> {9, hand}
+      [{_, 3}, {_, 2}] -> {8, hand}
+      [{_, 3} | _] -> {7, hand}
+      [{_, 2}, {_, 2}, _] -> {6, hand}
+      [{_, 2} | _] -> {5, hand}
+      _ -> {4, hand}
+    end
+  end
+
+  def maphand(hand) do
+    hand
+    |> String.graphemes()
+    |> Enum.map(&map/1)
+  end
+
+  def map(card) do
+    cards = ~w/J 2 3 4 5 6 7 8 9 T Q K A/
+    Enum.find_index(cards, &(&1 == card))
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Day7Part2, <<70, 79, 82, 49, 0, 0, 19, ...>>, {:map, 1}}
+```
+
+```elixir
+Day7Part2.solve(day7example1)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{6, 5905}
+```
+
+```elixir
+Day7Part2.solve(File.read!("d7.txt"))
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{1001, 249631254}
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Day 8
+
+```elixir
+day8example1 = """
+RL
+
+AAA = (BBB, CCC)
+BBB = (DDD, EEE)
+CCC = (ZZZ, GGG)
+DDD = (DDD, DDD)
+EEE = (EEE, EEE)
+GGG = (GGG, GGG)
+ZZZ = (ZZZ, ZZZ)
+"""
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+"RL\n\nAAA = (BBB, CCC)\nBBB = (DDD, EEE)\nCCC = (ZZZ, GGG)\nDDD = (DDD, DDD)\nEEE = (EEE, EEE)\nGGG = (GGG, GGG)\nZZZ = (ZZZ, ZZZ)\n"
+```
+
+```elixir
+defmodule Day8Part1 do
+  def solve(input) do
+    {sequence, map} = parse(input)
+
+    Stream.cycle(sequence)
+    |> Enum.reduce_while({0, "AAA"}, fn
+      _, {step, "ZZZ"} -> {:halt, step}
+      "L", {step, look} -> {:cont, {step + 1, Map.get(map, look) |> hd()}}
+      "R", {step, look} -> {:cont, {step + 1, Map.get(map, look) |> tl() |> hd()}}
+    end)
+  end
+
+  def parse(input) do
+    [sequence | map] = input |> String.split("\n\n", trim: true)
+    {String.graphemes(sequence), parse_map(hd(map))}
+  end
+
+  def parse_map(map) do
+    String.split(map, "\n", trim: true)
+    |> Enum.map(&String.split(&1, ["=", "(", ")", ",", " "], trim: true))
+    |> Enum.map(fn [k, v1, v2] -> {k, [v1, v2]} end)
+    |> Enum.into(%{})
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Day8Part1, <<70, 79, 82, 49, 0, 0, 13, ...>>, {:parse_map, 1}}
+```
+
+```elixir
+Day8Part1.solve(day8example1)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+2
+```
+
+```elixir
+Day8Part1.solve(File.read!("d8.txt"))
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+17287
+```
+
+```elixir
+Day8Part1.parse(day8example1)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{["R", "L"],
+ %{
+   "AAA" => ["BBB", "CCC"],
+   "BBB" => ["DDD", "EEE"],
+   "CCC" => ["ZZZ", "GGG"],
+   "DDD" => ["DDD", "DDD"],
+   "EEE" => ["EEE", "EEE"],
+   "GGG" => ["GGG", "GGG"],
+   "ZZZ" => ["ZZZ", "ZZZ"]
+ }}
+```
+
+```elixir
+defmodule Day8Part2 do
+  def solve(input) do
+    {sequence, map} = parse(input)
+
+    startpos = Map.keys(map) |> Enum.filter(&(String.at(&1, 2) == "A"))
+
+    Enum.map(startpos, fn pos ->
+      for pos_in_seq <- 0..(length(sequence) - 1) do
+        {p1, p2} = Enum.split(sequence, pos_in_seq)
+        steps_to_z(p2 ++ p1, pos, map)
+      end
+    end)
+  end
+
+  def steps_to_z(sequence, start, map) do
+    Stream.cycle(sequence)
+    |> Enum.reduce_while({0, start}, fn move, {step, look} ->
+      cond do
+        step > 1000 -> {:halt, step}
+        String.at(look, 2) == "Z" -> {:halt, step}
+        move == "L" -> {:cont, {step + 1, Map.get(map, look) |> hd()}}
+        move == "R" -> {:cont, {step + 1, Map.get(map, look) |> tl() |> hd()}}
+      end
+    end)
+  end
+
+  def parse(input) do
+    [sequence | map] = input |> String.split("\n\n", trim: true)
+    {String.graphemes(sequence), parse_map(hd(map))}
+  end
+
+  def parse_map(map) do
+    String.split(map, "\n", trim: true)
+    |> Enum.map(&String.split(&1, ["=", "(", ")", ",", " "], trim: true))
+    |> Enum.map(fn [k, v1, v2] -> {k, [v1, v2]} end)
+    |> Enum.into(%{})
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Day8Part2, <<70, 79, 82, 49, 0, 0, 17, ...>>, {:parse_map, 1}}
+```
+
+```elixir
+day8example2 = """
+LR
+
+11A = (11B, XXX)
+11B = (XXX, 11Z)
+11Z = (11B, XXX)
+22A = (22B, XXX)
+22B = (22C, 22C)
+22C = (22Z, 22Z)
+22Z = (22B, 22B)
+XXX = (XXX, XXX)
+"""
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+"LR\n\n11A = (11B, XXX)\n11B = (XXX, 11Z)\n11Z = (11B, XXX)\n22A = (22B, XXX)\n22B = (22C, 22C)\n22C = (22Z, 22Z)\n22Z = (22B, 22B)\nXXX = (XXX, XXX)\n"
+```
+
+```elixir
+Day8Part2.solve(day8example2)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[[2, 1001], [3, 1001]]
+```
+
+```elixir
+:math.erf()
+```
+
+```elixir
+Day8Part2.solve(File.read!("d8.txt"))
+```
+
+```elixir
+Day8Part2.all_end_with_z?(["ABZ", "ZZA", "CDZ"])
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+false
+```
+
+```elixir
+["ABZ", "ZZA", "CDZ"] |> Enum.filter(&(String.at(&1, 2) == "Z"))
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+["ABZ", "CDZ"]
+```
+
+```elixir
+[2,3,5] |>
 ```
